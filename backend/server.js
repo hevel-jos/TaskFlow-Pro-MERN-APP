@@ -2,28 +2,25 @@ const express = require("express");
 const mongoose = require("mongoose");
 const dotenv = require("dotenv");
 const cors = require("cors");
-const path = require("path");
 
-// Load environment variables
 dotenv.config();
 
+const app = express();
+
 // Debug environment variables
-console.log("=== ENVIRONMENT VARIABLES ===");
+console.log("=== ENVIRONMENT CHECK ===");
 console.log("PORT:", process.env.PORT);
 console.log("NODE_ENV:", process.env.NODE_ENV);
-console.log("MONGO_URI exists?", !!process.env.MONGO_URI);
-console.log("MONGODB_URI exists?", !!process.env.MONGODB_URI); // Check both names
-console.log("CLIENT_URL:", process.env.CLIENT_URL);
-console.log("========================");
-
-const app = express();
+console.log("MONGODB_URI exists:", !!process.env.MONGODB_URI);
+console.log("MONGO_URI exists:", !!process.env.MONGO_URI);
+console.log("=========================");
 
 // CORS configuration
 app.use(cors({
   origin: [
-    process.env.CLIENT_URL || "https://task-flow-pro-mern-app.vercel.app",
+    "https://task-flow-pro-mern-app.vercel.app",
     "http://localhost:3000",
-    "http://localhost:5173" // Vite default port
+    "http://localhost:5173"
   ],
   credentials: true,
   methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
@@ -33,12 +30,7 @@ app.use(cors({
 // Middleware
 app.use(express.json());
 
-// Routes
-app.use("/api/auth", require("./routes/authRoutes"));
-app.use("/api/clients", require("./routes/clientRoutes"));
-app.use("/api/tasks", require("./routes/taskRoutes"));
-
-// Test route
+// Test routes (keep these BEFORE MongoDB connection)
 app.get("/", (req, res) => {
   res.json({ 
     message: "ClientTask API is running",
@@ -47,12 +39,6 @@ app.get("/", (req, res) => {
   });
 });
 
-// Health check for Render
-app.get("/healthz", (req, res) => {
-  res.status(200).json({ status: "OK", timestamp: new Date() });
-});
-
-// API test route
 app.get("/api/test", (req, res) => {
   res.json({ 
     message: "API is working!",
@@ -61,37 +47,86 @@ app.get("/api/test", (req, res) => {
   });
 });
 
-// MongoDB Connection - Try both variable names
-const mongoURI = process.env.MONGODB_URI || process.env.MONGO_URI || "mongodb://localhost:27017/taskflow";
-
-console.log("Connecting to MongoDB...");
-console.log("Using URI:", mongoURI ? "Provided" : "Using fallback");
-
-mongoose.connect(mongoURI, {
-  useNewUrlParser: true,
-  useUnifiedTopology: true,
-  serverSelectionTimeoutMS: 5000, // Timeout after 5 seconds
-})
-.then(() => {
-  console.log("✅ MongoDB Connected Successfully!");
-  
-  const PORT = process.env.PORT || 5000;
-  
-  app.listen(PORT, "0.0.0.0", () => {
-    console.log(`🚀 Server running on port ${PORT}`);
-    console.log(`🌐 Frontend URL: ${process.env.CLIENT_URL || "Not set"}`);
-    console.log(`⚙️  Environment: ${process.env.NODE_ENV || "development"}`);
-    console.log(`🔗 MongoDB: Connected`);
-  });
-})
-.catch((error) => {
-  console.error("❌ MongoDB connection error:", error.message);
-  console.log("⚠️ Starting server without MongoDB connection...");
-  
-  const PORT = process.env.PORT || 5000;
-  
-  app.listen(PORT, "0.0.0.0", () => {
-    console.log(`🚀 Server running on port ${PORT} (without MongoDB)`);
-    console.log(`⚠️ Warning: MongoDB connection failed. Some features may not work.`);
-  });
+app.get("/healthz", (req, res) => {
+  res.status(200).json({ status: "OK", timestamp: new Date() });
 });
+
+// MongoDB Connection - Try multiple variable names
+const mongoURI = process.env.MONGODB_URI || process.env.MONGO_URI;
+
+console.log("Attempting MongoDB connection...");
+
+if (!mongoURI) {
+  console.log("❌ No MongoDB URI found in environment variables!");
+  console.log("⚠️ Starting server WITHOUT MongoDB (API will fail)");
+  
+  // Start server without MongoDB (for testing)
+  const PORT = process.env.PORT || 5000;
+  app.listen(PORT, "0.0.0.0", () => {
+    console.log(`⚠️ Server running on port ${PORT} (NO MONGODB)`);
+    console.log(`⚠️ API routes will return 500 errors`);
+  });
+} else {
+  console.log("Found MongoDB URI, attempting connection...");
+  
+  // Connect to MongoDB with better options
+  mongoose.connect(mongoURI, {
+    useNewUrlParser: true,
+    useUnifiedTopology: true,
+    serverSelectionTimeoutMS: 15000, // 15 seconds timeout
+    socketTimeoutMS: 45000, // 45 seconds socket timeout
+    family: 4, // Use IPv4, skip IPv6
+  })
+  .then(() => {
+    console.log("✅ MongoDB Connected Successfully!");
+    
+    // Load routes ONLY after MongoDB connects
+    app.use("/api/auth", require("./routes/authRoutes"));
+    app.use("/api/clients", require("./routes/clientRoutes"));
+    app.use("/api/tasks", require("./routes/taskRoutes"));
+    
+    const PORT = process.env.PORT || 5000;
+    
+    app.listen(PORT, "0.0.0.0", () => {
+      console.log(`🚀 Server running on port ${PORT}`);
+      console.log(`🌐 Frontend: https://task-flow-pro-mern-app.vercel.app`);
+      console.log(`⚙️  Environment: ${process.env.NODE_ENV || "development"}`);
+      console.log(`🔗 MongoDB: Connected to ${mongoURI.split('@')[1]?.split('.')[0] || 'database'}`);
+    });
+  })
+  .catch((error) => {
+    console.error("❌ MongoDB Connection FAILED:", error.message);
+    console.log("Error details:", error);
+    
+    // Start server anyway but API routes will fail
+    const PORT = process.env.PORT || 5000;
+    
+    // Define placeholder routes that show error
+    app.use("/api/auth", (req, res, next) => {
+      res.status(503).json({ 
+        error: "Database unavailable", 
+        message: "MongoDB connection failed. Please check your database configuration.",
+        timestamp: new Date()
+      });
+    });
+    
+    app.use("/api/clients", (req, res, next) => {
+      res.status(503).json({ 
+        error: "Database unavailable",
+        timestamp: new Date()
+      });
+    });
+    
+    app.use("/api/tasks", (req, res, next) => {
+      res.status(503).json({ 
+        error: "Database unavailable",
+        timestamp: new Date()
+      });
+    });
+    
+    app.listen(PORT, "0.0.0.0", () => {
+      console.log(`⚠️ Server running on port ${PORT} (MONGODB FAILED)`);
+      console.log(`❌ All API routes will return 503 Database Unavailable`);
+    });
+  });
+}
