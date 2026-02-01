@@ -19,7 +19,7 @@ const ManageUsers = () => {
   const [searchTerm, setSearchTerm] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const API_URL = "http://localhost:5000/api";
+  const API_URL = "https://taskflow-pro-mern-app.onrender.com/api";
 
   const config = {
     headers: {

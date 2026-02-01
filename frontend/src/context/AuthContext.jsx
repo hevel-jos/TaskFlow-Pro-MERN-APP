@@ -9,7 +9,7 @@ export const AuthProvider = ({ children }) => {
   const [loading, setLoading] = useState(true);
 
   // Base URL for your backend
-  const API_URL = "http://localhost:5000/api";
+  const API_URL = "https://taskflow-pro-mern-app.onrender.com/api";
 
   // Load user from localStorage AFTER component mounts
   useEffect(() => {
