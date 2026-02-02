@@ -6,7 +6,7 @@ const app = express();
 
 // CORS
 app.use(cors({
-  origin: "*",  // Allow all origins temporarily for testing
+  origin: ["https://task-flow-pro-mern-app.vercel.app", "http://localhost:3000"],
   credentials: true
 }));
 
