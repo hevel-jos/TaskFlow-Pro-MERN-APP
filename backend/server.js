@@ -40,6 +40,65 @@ if (mongoURI && mongoURI.startsWith("mongodb://")) {
   mongoose.connect(mongoURI.trim())
   .then(() => {
     console.log("✅ MongoDB Connected!");
+
+// Function to create default admin
+const createAdminUser = async () => {
+  try {
+    const User = require('./models/User');
+    const bcrypt = require('bcryptjs');
+    
+    // Check if admin exists
+    const adminExists = await User.findOne({ email: 'admin@gmail.com' });
+    
+    if (adminExists) {
+      console.log('ℹ️ Admin user already exists');
+      
+      // Update role to "user" if it's "client"
+      if (adminExists.role === 'client') {
+        adminExists.role = 'user';
+        await adminExists.save();
+        console.log('✅ Updated admin role to "user"');
+      }
+      
+      // Update password to 123456
+      const validPass = await bcrypt.compare('123456', adminExists.password);
+      if (!validPass) {
+        adminExists.password = await bcrypt.hash('123456', 10);
+        await adminExists.save();
+        console.log('✅ Updated admin password to "123456"');
+      }
+      
+      return;
+    }
+    
+    // Create new admin
+    const hashedPassword = await bcrypt.hash('123456', 10);
+    
+    const adminUser = new User({
+      name: 'Admin',
+      email: 'admin@gmail.com',
+      password: hashedPassword,
+      role: 'user'
+    });
+    
+    await adminUser.save();
+    console.log('✅ Admin user created:');
+    console.log('   Email: admin@gmail.com');
+    console.log('   Password: 123456');
+    console.log('   Role: user');
+    
+  } catch (error) {
+    console.log('⚠️ Could not create admin user:', error.message);
+  }
+};
+
+// Call it after MongoDB connects
+mongoose.connect(mongoURI).then(() => {
+  console.log('✅ MongoDB Connected!');
+  createAdminUser();  // Add this line
+  
+  // Load routes...
+});
     
     // Load routes
     try {
