@@ -13,7 +13,7 @@ const ClientDashboard = () => {
   const [filter, setFilter] = useState("all");
   const [isUpdating, setIsUpdating] = useState(false);
 
-  const API_URL = "https://taskflow-pro-mern-app.onrender.com/api";
+const API_URL = "/api";
 
   const logout = () => {
     logoutContext();

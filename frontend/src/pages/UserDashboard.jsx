@@ -13,7 +13,7 @@ const UserDashboard = () => {
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
 
-  const API_URL = "https://taskflow-pro-mern-app.onrender.com/api";
+ const API_URL = "/api";
 
   const config = {
     headers: {
